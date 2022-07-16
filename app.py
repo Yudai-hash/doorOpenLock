@@ -11,16 +11,23 @@ from linebot.models import (
 )
 
 import RPi.GPIO as GPIO
+import time
 
-duty = 80
+duty = 30
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(4,GPIO.OUT)
 GPIO.setup(17,GPIO.OUT)
 GPIO.setup(27,GPIO.OUT)
+GPIO.setup(25,GPIO.OUT)
 #GPIO.setup(27,GPIO.IN)
 
+#50 Hz
+p1 = GPIO.PWM(27,50)
+p2 = GPIO.PWM(4,50)
 
+p1.start(0)
+p2.start(0)
 
 app = Flask(__name__)
 
@@ -52,24 +59,44 @@ def handle_message(event):
     lineRes = event.message.text
     botRes = '鍵を施錠、開錠できます'
     #   GPIO.output(27,True)
-    if lineRes == 'lock':
-        GPIO.output(4,True)
-        GPIO.output(17,False)
-        #p1.ChangeDutyCycle(duty)
-        #p2.ChangeDutyCycle(0)
-        botRes = 'LOCK'
-    elif lineRes == 'open':
-        GPIO.output(4,False)
-        GPIO.output(17,True)
-        #p1.ChangeDutyCycle(0)
-        #p2.ChangeDutyCycle(duty)
-        botRes = 'OPEN'
-    elif lineRes == 'check':
-        if GPIO.input(27):
-            botRes = 'CLOSE'
-        else:
+    try:
+        if lineRes == 'lock':
+            #GPIO.output(4,True)
+            #GPIO.output(27,False)
+            p1.ChangeDutyCycle(duty)
+            p2.ChangeDutyCycle(0)
+            time.sleep(0.5)
+            p1.ChangeDutyCycle(0)
+            botRes = 'LOCK'
+        elif lineRes == 'open':
+            #GPIO.output(4,False)
+            #GPIO.output(27,True)
+            p1.ChangeDutyCycle(0)
+            p2.ChangeDutyCycle(duty)
+            time.sleep(0.5)
+            p2.ChangeDutyCycle(0)
             botRes = 'OPEN'
-    
+        elif lineRes == 'stop':
+            #GPIO.output(4,False)
+            #GPIO.output(27,False)
+            p1.ChangeDutyCycle(0)
+            p2.ChangeDutyCycle(0)
+            botRes = 'STOP'
+        elif lineRes == 'lightup':
+            GPIO.output(25,True)
+            botRes = 'lightup'
+        elif lineRes == 'lightdown':
+            GPIO.output(25,False)
+            botRes = 'lightdown'
+        elif lineRes == 'check':
+            if GPIO.input(27):
+                botRes = 'CLOSE'
+            else:
+                botRes = 'OPEN'
+    except KeyboardInterrupt:
+        #print('stop')
+        pass
+        
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=botRes))
@@ -79,3 +106,4 @@ def handle_message(event):
 
 if __name__ == "__main__":
     app.run()
+    GPIO.cleanup()
