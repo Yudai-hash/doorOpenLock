@@ -13,29 +13,27 @@ from linebot.models import (
 import RPi.GPIO as GPIO
 import time
 
-class SG92_Class:
-    #constractor
-    def __init__(self,Pin,ZeroOffsetDuty):
-        self.mPin = Pin
-        self.mZeroOffsetDuty = ZeroOffsetDuty
+duty = 50
 
-        #Set the sermo GPIO mode
-        GPIO.setup(self.mPin,GPIO.OUT)
-        self.mPwm = GPIO.PWM(self.mPin,50)
-    #set the position
-    def SetPos(self,pos):
-        duty = (12-2.5)/180*pos+2.5 + self.mZeroOffsetDuty
-        self.mPwm.start(duty)
-    #end the process
-   # def Cleanup(self):
-   #     self.SetPos(90)
-   #     time.sleep(1)
-   #     GPIO.setup(self.mPin,GPIO.IN)
-        
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(4,GPIO.OUT)
+GPIO.setup(17,GPIO.OUT)
+GPIO.setup(27,GPIO.OUT)
+GPIO.setup(25,GPIO.OUT)
+#GPIO.setup(27,GPIO.IN)
+
+#50 Hz
+p1 = GPIO.PWM(27,50)
+p2 = GPIO.PWM(4,50)
+
+p1.start(0)
+p2.start(0)
+
 app = Flask(__name__)
 
 line_bot_api = LineBotApi('4wmhUDo4We9wDOTNtwj0ts+S7HIU/8iBEk92oAXXlVhXvhHWskJlfk+RlDKrTGIx81FzYUFIVHCuEmk+eBkWx1UF9Gu4UmIo4X+knQDT7YFNhUytmA5/jnhrz+gbRk0zw3rXO8l3TvrwaEDVkODhygdB04t89/1O/w1cDnyilFU=')
 handler = WebhookHandler('29d9c8034e5a6bc9fd2e0d7217c760d7')
+
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -60,15 +58,36 @@ def callback():
 def handle_message(event):
     lineRes = event.message.text
     botRes = '鍵を施錠、開錠できます'
-    GPIO.setmode(GPIO.BCM)
-    Servo = SG92_Class(Pin=4,ZeroOffsetDuty=0)
+    #   GPIO.output(27,True)
     try:
         if lineRes == 'lock':
-            Servo.SetPos(0)
+            #GPIO.output(4,True)
+            #GPIO.output(27,False)
+            p1.ChangeDutyCycle(duty)
+            p2.ChangeDutyCycle(0)
+            time.sleep(0.5)
+            p1.ChangeDutyCycle(0)
             botRes = 'LOCK'
         elif lineRes == 'open':
-            Servo.SetPos(90)
+            #GPIO.output(4,False)
+            #GPIO.output(27,True)
+            p1.ChangeDutyCycle(0)
+            p2.ChangeDutyCycle(duty)
+            time.sleep(0.5)
+            p2.ChangeDutyCycle(0)
             botRes = 'OPEN'
+        elif lineRes == 'stop':
+            #GPIO.output(4,False)
+            #GPIO.output(27,False)
+            p1.ChangeDutyCycle(0)
+            p2.ChangeDutyCycle(0)
+            botRes = 'STOP'
+        elif lineRes == 'lightup':
+            GPIO.output(25,True)
+            botRes = 'lightup'
+        elif lineRes == 'lightdown':
+            GPIO.output(25,False)
+            botRes = 'lightdown'
         elif lineRes == 'check':
             if GPIO.input(27):
                 botRes = 'CLOSE'
@@ -77,9 +96,7 @@ def handle_message(event):
     except KeyboardInterrupt:
         #print('stop')
         pass
-    #finally:
-        #Servo.Cleanup()
-        #GPIO.clean()
+        
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=botRes))
@@ -89,4 +106,4 @@ def handle_message(event):
 
 if __name__ == "__main__":
     app.run()
-    GPIO.clean()
+    GPIO.cleanup()
